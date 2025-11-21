@@ -3,53 +3,39 @@ const axios = require('axios');
 const FormData = require('form-data');
 const app = express();
 
-app.get('/', (req, res) => res.send("Upscale API is Running!"));
+app.get('/', (req, res) => res.send("Vyro Upscale API is Running!"));
 
 app.get('/api/upscale', async (req, res) => {
     try {
         const imageUrl = req.query.url;
-        if (!imageUrl) return res.json({ status: false, message: "URL is required" });
+        if (!imageUrl) return res.status(400).json({ message: "URL is required" });
 
-        // ১. ছবি ডাউনলোড করা (Facebook থেকে)
-        const imageResponse = await axios.get(imageUrl, { responseType: 'stream' });
+        // ১. ছবি ডাউনলোড করা
+        const imageResponse = await axios.get(imageUrl, { responseType: 'arraybuffer' });
         
-        // ২. ফর্ম ডেটা তৈরি করা
+        // ২. Vyro AI-এর জন্য ডেটা সাজানো
         const form = new FormData();
-        // ⚠️ ফিক্স: এখানে 'image.jpg' নামটা যোগ করা হলো, এটা না দিলে সার্ভার ছবি চিনতে পারে না
-        form.append('image', imageResponse.data, 'image.jpg'); 
-        form.append('upscale', '2'); 
+        form.append('model_version', '1');
+        form.append('image', imageResponse.data, 'image.jpg');
 
-        // ৩. Upscale.media তে রিকোয়েস্ট পাঠানো
-        const response = await axios.post('https://api.upscale.media/v1/upscale', form, {
+        // ৩. Vyro সার্ভারে পাঠানো
+        const response = await axios.post('https://inferenceengine.vyro.ai/enhance', form, {
             headers: {
                 ...form.getHeaders(),
-                'User-Agent': 'Mozilla/5.0 (Android 10; Mobile; rv:109.0) Gecko/109.0 Firefox/118.0',
-                'Origin': 'https://www.upscale.media',
-                'Referer': 'https://www.upscale.media/'
-            }
+                'User-Agent': 'okhttp/4.9.3', // মোবাইলের মতো ভাব ধরছি
+            },
+            responseType: 'arraybuffer' // সরাসরি ছবি রিসিভ করবো
         });
 
-        const result = response.data;
-
-        if (result.error) {
-            return res.json({ status: false, message: "Failed to upscale from source" });
-        }
-
-        res.json({
-            status: true,
-            author: "RAFI",
-            result: {
-                input_url: imageUrl,
-                upscaled_url: result.data.image
-            }
-        });
+        // ৪. সরাসরি ছবি ব্রাউজারে/বটে পাঠিয়ে দেওয়া
+        res.set('Content-Type', 'image/png');
+        res.send(response.data);
 
     } catch (error) {
-        // এরর ডিবাগ করার জন্য কনসোলে প্রিন্ট হবে (Vercel Logs এ দেখা যাবে)
-        console.error(error.response ? error.response.data : error.message);
-        res.status(500).json({ status: false, message: error.message });
+        console.error(error.message);
+        res.status(500).json({ message: "Failed to upscale image." });
     }
 });
 
 module.exports = app;
-                                          
+        
