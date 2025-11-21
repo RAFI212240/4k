@@ -1,7 +1,7 @@
 const express = require('express');
 const axios = require('axios');
 const FormData = require('form-data');
-const https = require('https'); // নতুন মডিউল
+const https = require('https');
 const app = express();
 
 app.get('/', (req, res) => res.send("Vyro Upscale API is Running!"));
@@ -19,9 +19,10 @@ app.get('/api/upscale', async (req, res) => {
         form.append('model_version', '1');
         form.append('image', imageResponse.data, 'image.jpg');
 
-        // 🛠️ ফিক্স: SSL বাইপাস করার জন্য এজেন্ট তৈরি
+        // 🛠️ ফিক্স: SNI এবং SSL সমস্যার সমাধান
         const agent = new https.Agent({  
-            rejectUnauthorized: false // এটি SSL এরর বন্ধ করবে
+            rejectUnauthorized: false,
+            servername: 'inferenceengine.vyro.ai' // 💥 এই লাইনটি এরর ১১২ সমাধান করবে
         });
 
         // ৩. Vyro সার্ভারে পাঠানো
@@ -30,7 +31,7 @@ app.get('/api/upscale', async (req, res) => {
                 ...form.getHeaders(),
                 'User-Agent': 'okhttp/4.9.3',
             },
-            httpsAgent: agent, // এজেন্ট ব্যবহার করা হচ্ছে
+            httpsAgent: agent, 
             responseType: 'arraybuffer'
         });
 
@@ -40,13 +41,12 @@ app.get('/api/upscale', async (req, res) => {
 
     } catch (error) {
         console.error("Upscale Error:", error.message);
-        // এরর ডিটেইলস দেখালে সমস্যা বোঝা সহজ হবে
         if (error.response) {
-            console.error(error.response.data.toString());
+            // এরর লগ দেখার জন্য
+            console.error("Server Response:", error.response.status, error.response.statusText);
         }
         res.status(500).json({ message: "Failed to upscale image.", error: error.message });
     }
 });
 
 module.exports = app;
-                
