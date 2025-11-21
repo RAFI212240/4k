@@ -11,18 +11,18 @@ app.get('/api/upscale', async (req, res) => {
         const imageUrl = req.query.url;
         if (!imageUrl) return res.status(400).json({ message: "URL is required" });
 
-        // ১. ছবি ডাউনলোড করা
+        // ১. ছবি ডাউনলোড
         const imageResponse = await axios.get(imageUrl, { responseType: 'stream' });
         
-        // ২. ফর্ম ডেটা তৈরি করা
+        // ২. ফর্ম ডেটা
         const form = new FormData();
         form.append('model_version', '1');
         form.append('image', imageResponse.data, 'image.jpg');
 
-        // 🛠️ ফিক্স: SNI এবং SSL সমস্যার সমাধান
+        // 🛠️ ফিক্স: কড়া SSL বাইপাস
         const agent = new https.Agent({  
-            rejectUnauthorized: false,
-            servername: 'inferenceengine.vyro.ai' // 💥 এই লাইনটি এরর ১১২ সমাধান করবে
+            rejectUnauthorized: false, // সার্টিফিকেট চেক করবে না
+            checkServerIdentity: () => undefined // ডোমেইন নেম চেক করবে না (Error 112 ফিক্স)
         });
 
         // ৩. Vyro সার্ভারে পাঠানো
@@ -35,17 +35,17 @@ app.get('/api/upscale', async (req, res) => {
             responseType: 'arraybuffer'
         });
 
-        // ৪. সরাসরি ছবি পাঠানো
+        // ৪. ছবি পাঠানো
         res.set('Content-Type', 'image/png');
         res.send(response.data);
 
     } catch (error) {
-        console.error("Upscale Error:", error.message);
-        if (error.response) {
-            // এরর লগ দেখার জন্য
-            console.error("Server Response:", error.response.status, error.response.statusText);
-        }
-        res.status(500).json({ message: "Failed to upscale image.", error: error.message });
+        console.error("Upscale Error Details:", error.code, error.message);
+        res.status(500).json({ 
+            message: "Failed to upscale.", 
+            error: error.message,
+            code: error.code 
+        });
     }
 });
 
